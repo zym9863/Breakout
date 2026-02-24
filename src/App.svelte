@@ -18,6 +18,7 @@
     vy: number;
     radius: number;
     speed: number;
+    trail: { x: number; y: number; alpha: number }[];
   }
 
   interface Brick {
@@ -28,6 +29,18 @@
     row: number;
     col: number;
     alive: boolean;
+    hitAnim: number;
+  }
+
+  interface Particle {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    life: number;
+    maxLife: number;
+    color: string;
+    size: number;
   }
 
   interface GameMetrics {
@@ -46,12 +59,20 @@
     brickOffsetX: number;
   }
 
-  const HIGH_SCORE_KEY = 'breakout_high_score_v1';
+  const HIGH_SCORE_KEY = 'breakout_high_score_v2';
   const BRICK_ROWS = 6;
   const BRICK_COLS = 10;
   const INITIAL_LIVES = 3;
 
-  const BRICK_COLORS = ['#53f3ff', '#5dc1ff', '#6f92ff', '#8e6eff', '#ff69d9', '#ff7f84'];
+  // Cyberpunk neon palette for bricks
+  const BRICK_COLORS = [
+    '#00fff7', // Cyan (top row)
+    '#00ff88', // Neon green
+    '#f0ff00', // Neon yellow
+    '#ff6b00', // Neon orange
+    '#ff00ff', // Neon pink
+    '#ff0066', // Hot pink (bottom row)
+  ];
 
   let canvasEl: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D | null = null;
@@ -71,6 +92,9 @@
 
   let animationFrame = 0;
   let lastFrameTime = 0;
+  let gameTime = 0;
+
+  let particles: Particle[] = [];
 
   let metrics: GameMetrics = {
     paddleWidth: 140,
@@ -103,6 +127,7 @@
     vy: 0,
     radius: metrics.ballRadius,
     speed: metrics.ballBaseSpeed,
+    trail: [],
   };
 
   let bricks: Brick[] = [];
@@ -216,6 +241,7 @@
           row,
           col,
           alive,
+          hitAnim: 0,
         });
         index += 1;
       }
@@ -228,6 +254,7 @@
   function stickBallToPaddle(): void {
     ball.x = paddle.x + paddle.width / 2;
     ball.y = paddle.y - ball.radius - 2;
+    ball.trail = [];
   }
 
   function resetRound(centerPaddle: boolean): void {
@@ -241,6 +268,7 @@
     ball.speed = metrics.ballBaseSpeed;
     ball.vx = 0;
     ball.vy = 0;
+    ball.trail = [];
     ballStuckToPaddle = true;
     stickBallToPaddle();
   }
@@ -251,6 +279,7 @@
     status = 'ready';
     leftPressed = false;
     rightPressed = false;
+    particles = [];
     buildBricks();
     resetRound(true);
   }
@@ -306,6 +335,23 @@
     ball.speed = nextSpeed;
     ball.vx = Math.cos(direction) * nextSpeed;
     ball.vy = Math.sin(direction) * nextSpeed;
+  }
+
+  function spawnParticles(x: number, y: number, color: string, count: number): void {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 150 + 50;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1,
+        maxLife: Math.random() * 0.5 + 0.3,
+        color,
+        size: Math.random() * 3 + 1,
+      });
+    }
   }
 
   function movePaddleByInput(dt: number): void {
@@ -372,9 +418,19 @@
       }
 
       brick.alive = false;
+      brick.hitAnim = 1;
       bricksRemaining -= 1;
       score += 100;
       maybeUpdateHighScore();
+
+      // Spawn particles at brick center
+      const brickColor = BRICK_COLORS[brick.row % BRICK_COLORS.length];
+      spawnParticles(
+        brick.x + brick.width / 2,
+        brick.y + brick.height / 2,
+        brickColor,
+        12
+      );
 
       reflectFromRect(brick, previousX, previousY);
       speedUpBall();
@@ -404,14 +460,48 @@
     ball.vx = Math.sin(angle) * speed;
     ball.vy = -Math.cos(angle) * speed;
     ball.y = paddle.y - ball.radius - 1;
+
+    // Spawn particles on paddle hit
+    spawnParticles(ball.x, paddle.y, '#00fff7', 5);
+  }
+
+  function updateParticles(dt: number): void {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 200 * dt; // gravity
+      p.life -= dt / p.maxLife;
+      
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+      }
+    }
   }
 
   function updateGame(dt: number): void {
     movePaddleByInput(dt);
+    updateParticles(dt);
+
+    // Update brick hit animations
+    for (const brick of bricks) {
+      if (brick.hitAnim > 0) {
+        brick.hitAnim = Math.max(0, brick.hitAnim - dt * 5);
+      }
+    }
 
     if (ballStuckToPaddle) {
       stickBallToPaddle();
       return;
+    }
+
+    // Update ball trail
+    ball.trail.unshift({ x: ball.x, y: ball.y, alpha: 1 });
+    if (ball.trail.length > 12) {
+      ball.trail.pop();
+    }
+    for (let i = 0; i < ball.trail.length; i++) {
+      ball.trail[i].alpha = 1 - i / ball.trail.length;
     }
 
     const previousX = ball.x;
@@ -464,14 +554,13 @@
       return;
     }
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, arenaHeight);
-    gradient.addColorStop(0, '#040812');
-    gradient.addColorStop(1, '#02040a');
-    ctx.fillStyle = gradient;
+    // Clear with dark background
+    ctx.fillStyle = '#0a0a0f';
     ctx.fillRect(0, 0, arenaWidth, arenaHeight);
 
+    // Draw grid pattern
     ctx.save();
-    ctx.strokeStyle = 'rgba(85, 147, 255, 0.15)';
+    ctx.strokeStyle = 'rgba(0, 255, 247, 0.05)';
     ctx.lineWidth = 1;
     const gridSize = Math.max(28, Math.round(arenaWidth * 0.04));
     for (let x = 0; x <= arenaWidth; x += gridSize) {
@@ -488,37 +577,145 @@
     }
     ctx.restore();
 
+    // Draw ambient glow at top
+    const ambientGradient = ctx.createRadialGradient(
+      arenaWidth / 2, 0, 0,
+      arenaWidth / 2, 0, arenaHeight * 0.6
+    );
+    ambientGradient.addColorStop(0, 'rgba(255, 0, 255, 0.08)');
+    ambientGradient.addColorStop(0.5, 'rgba(0, 255, 247, 0.04)');
+    ambientGradient.addColorStop(1, 'transparent');
+    ctx.fillStyle = ambientGradient;
+    ctx.fillRect(0, 0, arenaWidth, arenaHeight);
+
+    // Draw particles
+    for (const p of particles) {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Draw bricks with glow effect
     ctx.save();
     for (const brick of bricks) {
       if (!brick.alive) {
         continue;
       }
       const rowColor = BRICK_COLORS[brick.row % BRICK_COLORS.length];
+      
+      // Hit animation scale
+      const scale = 1 + brick.hitAnim * 0.1;
+      const offsetX = brick.width * (1 - scale) / 2;
+      const offsetY = brick.height * (1 - scale) / 2;
+      
       ctx.fillStyle = rowColor;
-      ctx.strokeStyle = 'rgba(232, 245, 255, 0.25)';
       ctx.shadowColor = rowColor;
-      ctx.shadowBlur = 14;
-      drawRoundedRect(brick.x, brick.y, brick.width, brick.height, 6);
+      ctx.shadowBlur = 15;
+      
+      // Main brick
+      drawRoundedRect(
+        brick.x + offsetX,
+        brick.y + offsetY,
+        brick.width * scale,
+        brick.height * scale,
+        4
+      );
       ctx.fill();
-      ctx.stroke();
+      
+      // Inner highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.shadowBlur = 0;
+      drawRoundedRect(
+        brick.x + offsetX + 2,
+        brick.y + offsetY + 2,
+        brick.width * scale - 4,
+        brick.height * scale * 0.4,
+        2
+      );
+      ctx.fill();
     }
     ctx.restore();
 
+    // Draw paddle with neon glow
     ctx.save();
-    ctx.fillStyle = '#8cf9ff';
-    ctx.shadowColor = '#5df2ff';
-    ctx.shadowBlur = 20;
+    
+    // Paddle glow
+    ctx.shadowColor = '#00fff7';
+    ctx.shadowBlur = 25;
+    
+    // Paddle gradient
+    const paddleGradient = ctx.createLinearGradient(
+      paddle.x, paddle.y,
+      paddle.x, paddle.y + paddle.height
+    );
+    paddleGradient.addColorStop(0, '#00fff7');
+    paddleGradient.addColorStop(1, '#00b8b8');
+    ctx.fillStyle = paddleGradient;
+    
     drawRoundedRect(paddle.x, paddle.y, paddle.width, paddle.height, paddle.height / 2);
     ctx.fill();
+    
+    // Paddle center line
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(paddle.x + paddle.width / 2, paddle.y + 2);
+    ctx.lineTo(paddle.x + paddle.width / 2, paddle.y + paddle.height - 2);
+    ctx.stroke();
+    
     ctx.restore();
 
+    // Draw ball trail
     ctx.save();
-    ctx.fillStyle = '#d6f9ff';
-    ctx.shadowColor = '#74e7ff';
-    ctx.shadowBlur = 18;
+    for (let i = ball.trail.length - 1; i >= 0; i--) {
+      const t = ball.trail[i];
+      const size = ball.radius * (1 - i / ball.trail.length) * 0.8;
+      ctx.globalAlpha = t.alpha * 0.3;
+      ctx.fillStyle = '#ff00ff';
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Draw ball with neon glow
+    ctx.save();
+    
+    // Outer glow
+    ctx.shadowColor = '#ff00ff';
+    ctx.shadowBlur = 20;
+    
+    // Ball gradient
+    const ballGradient = ctx.createRadialGradient(
+      ball.x - ball.radius * 0.3,
+      ball.y - ball.radius * 0.3,
+      0,
+      ball.x,
+      ball.y,
+      ball.radius
+    );
+    ballGradient.addColorStop(0, '#ffffff');
+    ballGradient.addColorStop(0.3, '#ff88ff');
+    ballGradient.addColorStop(1, '#ff00ff');
+    ctx.fillStyle = ballGradient;
+    
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
     ctx.fill();
+    
+    ctx.restore();
+
+    // Draw border frame
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 255, 247, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, arenaWidth - 2, arenaHeight - 2);
     ctx.restore();
   }
 
@@ -529,6 +726,7 @@
 
     const dt = Math.min((time - lastFrameTime) / 1000, 0.034);
     lastFrameTime = time;
+    gameTime += dt;
 
     if (status === 'running') {
       updateGame(dt);
@@ -673,7 +871,7 @@
 <main class="breakout-page">
   <header class="title-block">
     <h1>Neon Breakout</h1>
-    <p>Crack every brick before your lives run out.</p>
+    <p>// crack every brick before your lives run out</p>
   </header>
 
   <section class="hud" aria-label="Game HUD">
@@ -721,13 +919,13 @@
     {/if}
   </section>
 
-    <p class="controls-hint">
-    Keyboard: <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd>/<kbd>&rarr;</kbd>
-    <span>&middot;</span>
+  <footer class="controls-hint">
+    <kbd>A</kbd>/<kbd>D</kbd> or <kbd>&#8592;</kbd>/<kbd>&#8594;</kbd>
+    <span>|</span>
     <kbd>Space</kbd> start/pause
-    <span>&middot;</span>
+    <span>|</span>
     <kbd>R</kbd> restart
-    <span>&middot;</span>
+    <span>|</span>
     Touch: drag paddle
-  </p>
+  </footer>
 </main>
