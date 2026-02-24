@@ -1,5 +1,7 @@
 # Neon Breakout
 
+中文 | [English](README-EN.md)
+
 一个使用 Svelte + TypeScript + Vite 构建的霓虹风格打砖块游戏。
 
 ## 游戏简介
