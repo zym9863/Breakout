@@ -1,47 +1,110 @@
-# Svelte + TS + Vite
+# Neon Breakout
 
-This template should help get you started developing with Svelte and TypeScript in Vite.
+一个使用 Svelte + TypeScript + Vite 构建的霓虹风格打砖块游戏。
 
-## Recommended IDE Setup
+## 游戏简介
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+Neon Breakout 是一款经典的打砖块游戏，采用现代霓虹视觉风格设计。玩家控制挡板反弹小球，击碎所有砖块即可获胜。
 
-## Need an official Svelte framework?
+## 游戏特性
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+- 🎮 **经典玩法** - 控制挡板反弹小球，击碎所有砖块
+- 🌟 **霓虹视觉** - 精美的霓虹灯效果和渐变色彩
+- 📱 **响应式设计** - 自适应不同屏幕尺寸
+- 💾 **本地存储** - 自动保存最高分记录
+- ⌨️ **多种控制** - 支持键盘和触摸操作
 
-## Technical considerations
+## 游戏控制
 
-**Why use this over SvelteKit?**
+### 键盘操作
+- `A` / `D` 或 `←` / `→` - 移动挡板
+- `Space` - 开始游戏 / 暂停
+- `R` - 重新开始
 
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
+### 触摸操作
+- 在画布上拖动以控制挡板位置
 
-This template contains as little as possible to get started with Vite + TypeScript + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
+## 游戏规则
 
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
+- 初始生命值：3 条
+- 每击碎一块砖块得 100 分
+- 小球每次击中砖块后会加速
+- 小球掉落屏幕底部会损失一条生命
+- 击碎所有砖块即可获胜
+- 分数会自动与最高分比较并保存
 
-**Why `global.d.ts` instead of `compilerOptions.types` inside `jsconfig.json` or `tsconfig.json`?**
+## 技术栈
 
-Setting `compilerOptions.types` shuts out all other types not explicitly listed in the configuration. Using triple-slash references keeps the default TypeScript setting of accepting type information from the entire workspace, while also adding `svelte` and `vite/client` type information.
+- **Svelte 5** - 前端框架
+- **TypeScript** - 类型安全
+- **Vite 8** - 构建工具
+- **Canvas API** - 游戏渲染
 
-**Why include `.vscode/extensions.json`?**
+## 快速开始
 
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
+### 安装依赖
 
-**Why enable `allowJs` in the TS template?**
-
-While `allowJs: false` would indeed prevent the use of `.js` files in the project, it does not prevent the use of JavaScript syntax in `.svelte` files. In addition, it would force `checkJs: false`, bringing the worst of both worlds: not being able to guarantee the entire codebase is TypeScript, and also having worse typechecking for the existing JavaScript. In addition, there are valid use cases in which a mixed codebase may be relevant.
-
-**Why is HMR not preserving my local component state?**
-
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/rixo/svelte-hmr#svelte-hmr).
-
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```ts
-// store.ts
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+```bash
+pnpm install
 ```
+
+### 开发模式
+
+```bash
+pnpm dev
+```
+
+### 构建生产版本
+
+```bash
+pnpm build
+```
+
+### 预览生产版本
+
+```bash
+pnpm preview
+```
+
+### 类型检查
+
+```bash
+pnpm check
+```
+
+## 项目结构
+
+```
+breakout/
+├── src/
+│   ├── App.svelte      # 游戏主组件
+│   ├── main.ts         # 应用入口
+│   └── app.css         # 全局样式
+├── public/             # 静态资源
+├── index.html          # HTML 模板
+├── vite.config.ts      # Vite 配置
+├── svelte.config.js    # Svelte 配置
+└── tsconfig.json       # TypeScript 配置
+```
+
+## 游戏参数
+
+游戏中的关键参数（可在 `App.svelte` 中调整）：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `BRICK_ROWS` | 6 | 砖块行数 |
+| `BRICK_COLS` | 10 | 砖块列数 |
+| `INITIAL_LIVES` | 3 | 初始生命值 |
+| `ballBaseSpeed` | 380 | 小球初始速度 |
+| `ballMaxSpeed` | 760 | 小球最大速度 |
+
+## 开发环境
+
+推荐使用 VS Code 并安装以下扩展：
+
+- [Svelte for VS Code](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode)
+
+## 许可证
+
+MIT
